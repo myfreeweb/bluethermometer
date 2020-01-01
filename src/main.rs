@@ -20,7 +20,15 @@ use {
     rubble_nrf5x::radio::{BleRadio, PacketBuffer},
 };
 
-fn advertise_beacon(radio: &mut BleRadio, hw_addr: &[u8; 6], addr_kind: AddressKind, sensor_idx: u16, temperature: I8F8) {
+fn advertise_beacon(
+    radio: &mut BleRadio,
+    hw_addr: &[u8; 6],
+    addr_kind: AddressKind,
+    uptime_seconds: u32,
+    sent_frames: &mut u32,
+    sensor_idx: u16,
+    temperature: I8F8,
+) {
     let mut addr = *hw_addr;
     BigEndian::write_u16(&mut addr[3..], sensor_idx);
     let device_address = DeviceAddress::new(addr, addr_kind);
@@ -47,9 +55,13 @@ fn advertise_beacon(radio: &mut BleRadio, hw_addr: &[u8; 6], addr_kind: AddressK
     )
     .unwrap()
     .broadcast(radio);
+    *sent_frames += 1;
 
     let mut tlm_frame = [0x20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     BigEndian::write_i16(&mut tlm_frame[4..], temperature.to_bits());
+    BigEndian::write_u32(&mut tlm_frame[6..], *sent_frames);
+    // XXX: spec says '0.1 resolution' but it's named SEC_CNT and an Android app interprets as seconds
+    BigEndian::write_u32(&mut tlm_frame[10..], uptime_seconds);
 
     Beacon::new(
         device_address,
@@ -63,6 +75,7 @@ fn advertise_beacon(radio: &mut BleRadio, hw_addr: &[u8; 6], addr_kind: AddressK
     )
     .unwrap()
     .broadcast(radio);
+    *sent_frames += 1;
 }
 
 #[rtfm::app(device = nrf51, peripherals = true)]
@@ -72,6 +85,10 @@ const APP: () = {
         ble_tx_buf: PacketBuffer,
         #[init([0; MIN_PDU_BUF])]
         ble_rx_buf: PacketBuffer,
+        #[init(0)]
+        sent_frames: u32,
+        #[init(0)]
+        uptime_seconds: u32,
         radio: BleRadio,
         devaddr: [u8; 6],
         devaddr_type: AddressKind,
@@ -120,15 +137,22 @@ const APP: () = {
         }
     }
 
-    #[task(binds = TIMER1, resources = [beacon_timer, devaddr, devaddr_type, radio, onboard_temp])]
+    #[task(binds = TIMER1, resources = [beacon_timer, devaddr, devaddr_type, radio, onboard_temp, sent_frames, uptime_seconds])]
     fn timer1(ctx: timer1::Context) {
         // Acknowledge event so that the interrupt doesn't keep firing
         ctx.resources.beacon_timer.clear_compare_event(TimerCc::CC0);
 
         let addr = &*ctx.resources.devaddr;
         let addr_type = *ctx.resources.devaddr_type;
+        let radio = &mut *ctx.resources.radio;
+        let uptime = &mut *ctx.resources.uptime_seconds;
+        let frames = &mut *ctx.resources.sent_frames;
+
+        *uptime += 2;
+
         let onb = I30F2::from_bits(ctx.resources.onboard_temp.measure().into_bits()); // fixed > fpa
-        advertise_beacon(&mut *ctx.resources.radio, addr, addr_type, u16::max_value(), I8F8::from_num(onb));
+        advertise_beacon(radio, addr, addr_type, *uptime, frames, u16::max_value(), I8F8::from_num(onb));
+
         // TODO: one-wire
     }
 };
