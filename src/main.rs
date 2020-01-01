@@ -5,7 +5,7 @@ use {
     byteorder::{BigEndian, ByteOrder, LittleEndian},
     fixed::types::{I30F2, I8F8},
     nrf51_hal::temp::Temp,
-    panic_halt as _,
+    panic_semihosting as _,
     rubble::{
         beacon::Beacon,
         link::{

@@ -26,7 +26,7 @@ cortex-m-rtfm = "0.5.1"
 cortex-m-rt = "0.6.11"
 byteorder = { version = "1.3.2", default-features = false }
 fixed = "0.5.1"
-panic-halt = "0.2.0"
+panic-semihosting = "0.5"
 
 [patch.crates-io]
 nrf51 = { git = "https://github.com/nrf-rs/nrf51" }
