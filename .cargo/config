@@ -1,0 +1,9 @@
+[build]
+target = 'thumbv6m-none-eabi'
+
+[target.'cfg(all(target_arch = "arm", target_os = "none"))']
+runner = 'arm-none-eabi-gdb'
+rustflags = [
+	"-C", "linker=ld.lld90",
+	"-C", "link-arg=-Tlink.x",
+]
