@@ -3,11 +3,17 @@
 
 use {
     byteorder::{BigEndian, ByteOrder, LittleEndian},
+    core::convert::TryInto,
+    embedded_hal::blocking::delay::DelayMs,
     fixed::types::{I30F2, I8F8},
+    heapless::Vec,
     nrf51_hal::{
+        delay::Delay,
+        gpio::{gpio::PIN, GpioExt, OpenDrain, Output},
         hi_res_timer::{As16BitTimer, HiResTimer, TimerCc, TimerFrequency},
         temp::Temp,
     },
+    onewire::{ds18b20, OneWire, Sensor, DS18B20},
     panic_semihosting as _,
     rubble::{
         beacon::Beacon,
@@ -92,8 +98,10 @@ const APP: () = {
         radio: BleRadio,
         devaddr: [u8; 6],
         devaddr_type: AddressKind,
-        beacon_timer: HiResTimer<nrf51::TIMER1, u16>,
+        delay: Delay,
         onboard_temp: Temp,
+        onewire_pin: PIN<Output<OpenDrain>>,
+        beacon_timer: HiResTimer<nrf51::TIMER1, u16>,
     }
 
     #[init(resources = [ble_tx_buf, ble_rx_buf])]
@@ -121,6 +129,9 @@ const APP: () = {
 
         let radio = BleRadio::new(ctx.device.RADIO, &ctx.device.FICR, ctx.resources.ble_tx_buf, ctx.resources.ble_rx_buf);
 
+        let mut pin = ctx.device.GPIO.split().pin0.into_open_drain_output();
+        pin.internal_pull_up(false);
+
         let mut beacon_timer = ctx.device.TIMER1.as_16bit_timer();
         beacon_timer.set_frequency(TimerFrequency::Freq31250Hz);
         beacon_timer.set_compare_register(TimerCc::CC0, 31_250 * 2); // NOTE: 16-bit
@@ -132,12 +143,16 @@ const APP: () = {
             radio,
             devaddr,
             devaddr_type,
+            delay: Delay::new(ctx.device.TIMER0),
             onboard_temp: Temp::new(ctx.device.TEMP),
+            onewire_pin: pin.into(),
             beacon_timer,
         }
     }
 
-    #[task(binds = TIMER1, resources = [beacon_timer, devaddr, devaddr_type, radio, onboard_temp, sent_frames, uptime_seconds])]
+    #[task(binds = TIMER1, resources = [
+        beacon_timer, devaddr, devaddr_type, radio, delay, onboard_temp, onewire_pin, sent_frames, uptime_seconds
+    ])]
     fn timer1(ctx: timer1::Context) {
         // Acknowledge event so that the interrupt doesn't keep firing
         ctx.resources.beacon_timer.clear_compare_event(TimerCc::CC0);
@@ -153,6 +168,29 @@ const APP: () = {
         let onb = I30F2::from_bits(ctx.resources.onboard_temp.measure().into_bits()); // fixed > fpa
         advertise_beacon(radio, addr, addr_type, *uptime, frames, u16::max_value(), I8F8::from_num(onb));
 
-        // TODO: one-wire
+        let delay = &mut *ctx.resources.delay;
+        let mut wire = OneWire::new(&mut *ctx.resources.onewire_pin, false);
+        wire.reset(delay).unwrap();
+        let mut search = onewire::DeviceSearch::new();
+        let mut sensors = Vec::<DS18B20, heapless::consts::U16>::new();
+        let mut max_delay = 0;
+        while let Some(device) = wire.search_next(&mut search, delay).unwrap() {
+            match device.address[0] {
+                ds18b20::FAMILY_CODE => {
+                    sensors.push(unsafe { DS18B20::new_forced(device) }); // XXX: .unwrap() needs Debug on the type;
+                    let delay_time = sensors[sensors.len() - 1].measure_temperature(&mut wire, delay).unwrap().time_ms();
+                    if max_delay < delay_time {
+                        max_delay = delay_time;
+                    }
+                }
+                _ => {}
+            }
+        }
+        delay.delay_ms(max_delay);
+        for (i, sensor) in sensors.iter().enumerate() {
+            // NOTE: read_measurement reinterprets as float, which it is
+            let temp = sensor.read_measurement(&mut wire, delay).unwrap();
+            advertise_beacon(radio, addr, addr_type, *uptime, frames, i.try_into().unwrap(), I8F8::from_num(temp));
+        }
     }
 };

@@ -20,13 +20,18 @@ rubble = { git = "https://github.com/myfreeweb/rubble", branch = "nrf51-upd", de
 # rubble-nrf5x = { git = "https://github.com/jonas-schievink/rubble", features = ["51"] }
 rubble-nrf5x = { git = "https://github.com/myfreeweb/rubble", branch = "nrf51-upd", features = ["51"] }
 nrf51 = { git = "https://github.com/nrf-rs/nrf51", features = ["rt", "memory-aa"] }
-nrf51-hal = { version = "0.7.1", features = ["rt"] }
+# nrf51-hal = { version = "0.7.1", features = ["rt"] }
+nrf51-hal = { git = "https://github.com/myfreeweb/nrf51-hal", branch = "for-onewire", features = ["rt"] }
+embedded-hal = "0.2"
 cortex-m = "0.6.1"
 cortex-m-rtfm = "0.5.1"
 cortex-m-rt = "0.6.11"
+onewire = "0.3"
+heapless = "0.5"
 byteorder = { version = "1.3.2", default-features = false }
 fixed = "0.5.1"
 panic-semihosting = "0.5"
 
 [patch.crates-io]
 nrf51 = { git = "https://github.com/nrf-rs/nrf51" }
+nrf51-hal = { git = "https://github.com/myfreeweb/nrf51-hal", branch = "for-onewire" }

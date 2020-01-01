@@ -4,11 +4,12 @@ Pure Rust (using [Rubble] Bluetooth LE stack) firmware for the Nordic nRF51 seri
 that exposes temperature sensors as [Eddystone] beacons (with temperature in telemetry frames).
 Which is supported by [Home Assistant] among other things.
 
-(for now, only onboard sensor. coming: one-wire)
+Supports the on-board temp sensor and [onewire] connected DS18B20 sensors.
 
 [Rubble]: https://github.com/jonas-schievink/rubble
 [Eddystone]: https://github.com/google/eddystone
 [Home Assistant]: https://www.home-assistant.io/integrations/eddystone_temperature/
+[onewire]: https://crates.io/crates/onewire
 
 ## License
 

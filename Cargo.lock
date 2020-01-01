@@ -49,9 +49,12 @@ dependencies = [
  "cortex-m",
  "cortex-m-rt",
  "cortex-m-rtfm",
+ "embedded-hal",
  "fixed",
+ "heapless",
  "nrf51",
  "nrf51-hal",
+ "onewire",
  "panic-semihosting",
  "rubble",
  "rubble-nrf5x",
@@ -234,8 +237,7 @@ dependencies = [
 [[package]]
 name = "nrf51-hal"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2367386170f11cc7315f689f79ded3481ed793b1e0382c5913f72374d59edf0"
+source = "git+https://github.com/myfreeweb/nrf51-hal?branch=for-onewire#fce3f4ea2b395498ec039e82091d0fa2436b1835"
 dependencies = [
  "cast",
  "cortex-m",
@@ -244,6 +246,16 @@ dependencies = [
  "nb",
  "nrf51",
  "void",
+]
+
+[[package]]
+name = "onewire"
+version = "0.3.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73be67dc9e140c0963625510b4a09c07edf2c07c9dab53134d863e4d302c9ea1"
+dependencies = [
+ "byteorder",
+ "embedded-hal",
 ]
 
 [[package]]
